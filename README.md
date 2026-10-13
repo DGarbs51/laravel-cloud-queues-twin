@@ -1,7 +1,11 @@
 # laravel-cloud-queues-twin
 
 A Laravel 13 baseline for [python-cloud-queues](https://github.com/DGarbs51/python-cloud-queues)
-on [Laravel Cloud](https://cloud.laravel.com). Open the page, press **Run queue checks**,
+on [Laravel Cloud](https://cloud.laravel.com).
+
+Live: https://laravel-cloud-queues-twin-main-ioospn.laravel-demo.cloud
+
+Open the page, press **Run queue checks**,
 and read each result. Linear: SE-484; Python parity work: SE-486.
 
 | Case | Workload |
@@ -118,3 +122,32 @@ with `php artisan queue:work redis` and restart supervision: all seven cases pas
 A 1,000-job run passes at 306.1 jobs/s, p95 838.9 ms, zero lost or duplicated jobs.
 The unchanged Python HTTP helper works against the twin, and the Python check and
 throughput evaluators produce identical results from its Redis records.
+
+## Cloud verification
+
+Deployment `depl-a2f7da55-6b28-4bae-820e-dfe54690e14b` succeeded at implementation commit
+`193d139`, Laravel 13.35.0 on Cloud PHP 8.5.11. The live seven-case check passes,
+including delayed start at 6.0 seconds and timeout attempt-two redelivery after 8 seconds.
+A 1,000-job run (`7a1810179218021b52084d129f10fed9`) passes at 105.4 jobs/s,
+p95 467 ms, zero lost jobs and zero duplicates.
+
+Cloud's failed-job API lists `demo.failing` (RuntimeException) and `demo.timeout`
+(TimeoutExceededException), both at two attempts. Cloud Retry accepts the failed job,
+redelivers the original payload UUID with attempts reset, and the intentionally failing
+job fails again and creates a fresh failed-job row. The original row disappears after
+retry completes. Two attempt-one/two delivery cycles were observed after the retry
+request; the cause of the extra cycle was not established. This remains baseline
+behavior to investigate in SE-480/SE-486 rather than an exactly-once Retry claim.
+The dashboard button itself was not automated: Chrome Apple Events JavaScript and
+macOS accessibility access are disabled. API evidence does not prove the UI click.
+
+| Resource | ID |
+|---|---|
+| Application | `app-a2f7d8f8-db80-4210-8c96-592cbe9802f6` |
+| Main environment | `env-a2f7d927-668b-4778-9e00-8d75f077e422` |
+| App compute | `inst-a2f7d927-702d-4dee-bf71-a8cead702667` |
+| Managed default queue | `inst-a2f7d9b2-abec-4a38-bc97-2a7ea049e418` |
+| Always-on private Valkey | `cache-a2f7d980-42e1-40ae-9668-da2c26acb5f4` |
+
+Cloud's automatically generated, undeployed production environment was removed;
+only `main` remains and is the application's default. No existing apps were changed.
