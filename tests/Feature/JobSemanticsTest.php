@@ -64,6 +64,31 @@ class JobSemanticsTest extends TestCase
         }
     }
 
+    public function test_long_job_sleeps_the_requested_seconds_once(): void
+    {
+        Sleep::fake();
+        $job = new DemoJob('long', 60);
+        $delivery = Mockery::mock(Job::class);
+        $delivery->shouldReceive('uuid')->andReturn('uid');
+        $delivery->shouldReceive('attempts')->andReturn(1);
+        $job->setJob($delivery);
+        $events = [];
+        $telemetry = Mockery::mock(Telemetry::class)->makePartial();
+        $telemetry->shouldReceive('record')->andReturnUsing(function ($event, $fields) use (&$events): void {
+            $events[] = [$event, $fields];
+        });
+        $job->handle($telemetry);
+        $this->assertSame(['started', 'processed'], array_column($events, 0));
+        $this->assertSame('demo.long', $events[0][1]['job']);
+        $this->assertSame(1, $job->tries);
+        $this->assertSame(0, $job->timeout);
+        Sleep::assertSequence([Sleep::for(60)->seconds()]);
+        $bad = new DemoJob('long', 0);
+        $bad->setJob($delivery);
+        $this->expectException(RuntimeException::class);
+        $bad->handle($telemetry);
+    }
+
     public function test_throughput_launcher_and_tick(): void
     {
         Queue::fake();

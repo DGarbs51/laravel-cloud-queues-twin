@@ -78,6 +78,7 @@ the app grants no cross-origin access.
 | `GET /api/stats` | `{framework, python, version, mode, queue, depth, counts, events, check}` |
 | `POST /api/reset` | 200 `{ok: true}`; deletes aggregate events, counts and check only |
 | `POST /api/throughput` | 202 `{run}`; `{count: N}`, default 1,000; 409 if a run is active |
+| `POST /api/long` | 200 `{uuid, seconds}`; `{seconds: N}` integer 1–3600, else 400. Dispatches `demo.long` (tries 1, no job timeout) |
 | `GET /api/throughput/{run}` | `{state, count, processed, jobs_per_s, wait_ms: {p50, p95}, lost, duplicates, verdict}`; unknown run 404 |
 
 POSTs require `Content-Type: application/json` and an object (empty body becomes `{}`).

@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\DemoJob;
 use App\Telemetry;
 use App\Throughput;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
@@ -21,7 +23,7 @@ class ContractTest extends TestCase
 
     public function test_post_requires_bounded_json_object(): void
     {
-        foreach (['/api/check', '/api/reset', '/api/throughput'] as $path) {
+        foreach (['/api/check', '/api/reset', '/api/throughput', '/api/long'] as $path) {
             $this->call('POST', $path, server: ['CONTENT_TYPE' => 'text/plain'], content: '{}')
                 ->assertStatus(415)->assertExactJson(['error' => 'expected application/json']);
             foreach (['[]', 'null', 'NaN', '{', '"hi"', "\xff"] as $bad) {
@@ -72,5 +74,18 @@ class ContractTest extends TestCase
         $this->postJson('/api/throughput', ['count' => 1000])->assertStatus(202)->assertExactJson(['run' => 'abc']);
         $this->get('/api/throughput/abc')->assertOk()->assertExactJson(['state' => 'running']);
         $this->get('/api/throughput/unknown')->assertStatus(404)->assertExactJson(['error' => 'unknown run']);
+    }
+
+    public function test_long_route_bounds_seconds_and_dispatches_one_job(): void
+    {
+        Queue::fake();
+        foreach (['{}', '{"seconds": 0}', '{"seconds": true}', '{"seconds": 3601}', '{"seconds": "60"}', '{"seconds": 1.5}'] as $bad) {
+            $this->call('POST', '/api/long', server: ['CONTENT_TYPE' => 'application/json'], content: $bad)
+                ->assertStatus(400)->assertExactJson(['error' => 'seconds must be an integer from 1 to 3600']);
+        }
+        Queue::assertNothingPushed();
+        $this->postJson('/api/long', ['seconds' => 60])->assertOk()->assertJson(['seconds' => 60]);
+        Queue::assertPushed(DemoJob::class, fn ($job) => $job->kind === 'long' && $job->seconds === 60
+            && $job->tries === 1 && $job->timeout === 0 && $job->displayName() === 'demo.long');
     }
 }

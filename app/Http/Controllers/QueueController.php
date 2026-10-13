@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\DemoJob;
 use App\Telemetry;
 use App\Throughput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Queue;
 
 class QueueController extends Controller
 {
@@ -37,6 +39,18 @@ class QueueController extends Controller
         [$code, $body] = $throughput->start($request->attributes->get('contract_data'));
 
         return response()->json($body, $code);
+    }
+
+    public function long(Request $request): JsonResponse
+    {
+        $seconds = $request->attributes->get('contract_data')['seconds'] ?? null;
+        if (! is_int($seconds) || $seconds < 1 || $seconds > 3600) {
+            return response()->json(['error' => 'seconds must be an integer from 1 to 3600'], 400);
+        }
+        $job = new DemoJob('long', $seconds);
+        Queue::push($job);
+
+        return response()->json(['uuid' => $job->uuid, 'seconds' => $seconds]);
     }
 
     public function throughput(string $run, Throughput $throughput): JsonResponse
