@@ -11,6 +11,7 @@ Route::middleware(ApiContract::class)->group(function (): void {
     Route::post('/api/check', [QueueController::class, 'check']);
     Route::post('/api/reset', [QueueController::class, 'reset']);
     Route::post('/api/throughput', [QueueController::class, 'startThroughput']);
+    Route::post('/api/long', [QueueController::class, 'long']);
     Route::get('/api/throughput/{run}', [QueueController::class, 'throughput'])->where('run', '.*');
     Route::fallback(fn () => response()->json(['error' => 'not found'], 404));
 });

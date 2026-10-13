@@ -22,7 +22,7 @@ class DemoJob implements ShouldQueue
 
     public float $queuedAt;
 
-    public function __construct(public string $kind)
+    public function __construct(public string $kind, public int $seconds = 0)
     {
         $this->tries = match ($kind) {
             'flaky' => 3, 'failing', 'timeout' => 2, default => 1
@@ -30,7 +30,9 @@ class DemoJob implements ShouldQueue
         $this->backoff = match ($kind) {
             'flaky' => [2], 'failing' => [1], default => [0]
         };
-        $this->timeout = $kind === 'timeout' ? 3 : 60;
+        $this->timeout = match ($kind) {
+            'timeout' => 3, 'long' => 0, default => 60
+        };
         $this->queuedAt = microtime(true);
     }
 
@@ -48,6 +50,9 @@ class DemoJob implements ShouldQueue
                 'quick', 'async', 'delayed', 'burst' => Sleep::usleep(random_int(50_000, 300_000)),
                 'slow' => Sleep::sleep(3),
                 'timeout' => Sleep::sleep(10),
+                'long' => ($this->seconds >= 1 && $this->seconds <= 3600)
+                    ? Sleep::sleep($this->seconds)
+                    : throw new RuntimeException('long job seconds out of range'),
                 'flaky' => $this->attempts() === 1 ? throw new RuntimeException('flaky job fails on its first attempt') : null,
                 'failing' => throw new RuntimeException('this job always fails'),
                 default => throw new RuntimeException('unknown demo job'),
